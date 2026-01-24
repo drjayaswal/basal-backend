@@ -41,21 +41,44 @@ npm run build
 npm start
 ```
 
-## Running with Frontend
+## Git Workflow
 
+To stage all changes for a commit:
 ```bash
-# Ensure backend is running on http://localhost:5000 (or configured port)
+git add .
+```
 
-# In another terminal, clone and run frontend
-git clone https://github.com/drjayaswal/biasbreaker-frontend.git
-cd biasbreaker-frontend
-npm install
-npm start
+To commit changes with a message:
+```bash
+git commit -m "describe your changes"
+```
+
+## Docker Deployment
+
+To build the backend Docker image:
+```bash
+docker build -t dhruv2k3/biasbreaker-backend:latest .
+```
+
+To test locally:
+```bash
+docker run -p 5000:5000 dhruv2k3/biasbreaker-backend
+```
+
+To push to Docker Hub:
+```bash
+docker push dhruv2k3/biasbreaker-backend:latest
+```
+
+To run via docker-compose:
+```bash
+docker compose pull
+docker compose up -d
 ```
 
 ## API Documentation
 
-[API endpoints will be documentation here] or visit `http://localhost:8000/docs`
+Visit `http://localhost:5000/docs` for API endpoints documentation.
 
 ## Contributing
 
