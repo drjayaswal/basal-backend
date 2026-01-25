@@ -196,6 +196,15 @@ async def get_folder(
     save_to_history(db, current_user, results)
     return results
 
+@app.post("/get-description")
+async def get_description(file: UploadFile = File(...)):
+
+    content = await file.read()
+
+    text = extract_text(content, file.content_type)
+    
+    return {"description": text}
+
 @app.post("/upload")
 async def upload_files(
     files: List[UploadFile] = File(...), 
