@@ -10,10 +10,6 @@ name: biasbreaker
 #     env_file: .env
 #     restart: always
 
-# networks:
-#   default:
-#     name: biasbreaker-network
-
 
 
 # --- hub.docker Image Context ---
@@ -27,7 +23,3 @@ services:
     env_file:
       - .env
     restart: always
-
-networks:
-  default:
-    name: biasbreaker-network
