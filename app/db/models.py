@@ -1,7 +1,7 @@
 import uuid, enum
-from sqlalchemy import Column, String, DateTime, func, ForeignKey, Float, Enum, Integer
+from sqlalchemy import Column, String, DateTime, func, ForeignKey, Float, Enum
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from .connect import Base
 
 class AnalysisStatus(enum.Enum):
