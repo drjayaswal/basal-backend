@@ -25,8 +25,8 @@ class AnalysisResponse(BaseModel):
     filename: str
     created_at: datetime
     details: Optional[dict] = None
+    candidate_info: Optional[dict] = None
     match_score: Optional[float] = None
-
     model_config = ConfigDict(from_attributes=True)
 
 class UserResponse(UserBase):

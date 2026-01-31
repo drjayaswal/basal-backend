@@ -9,16 +9,11 @@ logger = logging.getLogger(__name__)
 get_settings = settings()
 
 async def ml_analysis_drive(user_id: str, files: list, google_token: str, description: str):
-    """
-    Handles multiple files from Google Drive.
-    """
     db = SessionLocal()
     target_url = f"{get_settings.ML_SERVER_URL}/analyze-drive"
     
     async with httpx.AsyncClient(timeout=180.0) as client:
         for file_info in files:
-            # 1. Create a placeholder in the DB so the user sees "Processing"
-            # We pass s3_key=None because it's a Drive file
             record = create_initial_record(
                 db=db, 
                 user_id=user_id, 
@@ -44,7 +39,8 @@ async def ml_analysis_drive(user_id: str, files: list, google_token: str, descri
                         file_id=str(record.id), 
                         status=AnalysisStatus.COMPLETED, 
                         score=ml_data.get("match_score", 0),
-                        details=ml_data.get("analysis_details", {})
+                        details=ml_data.get("analysis_details", {}),
+                        candidate_info=ml_data.get("candidate_info", {})
                     )
                 else:
                     logger.error(f"ML Error for {file_info.get('name')}: {resp.text}")
@@ -57,9 +53,6 @@ async def ml_analysis_drive(user_id: str, files: list, google_token: str, descri
     db.close()
 
 async def ml_analysis_s3(file_id: str, s3_url: str, filename: str, description: str):
-    """
-    Handles single file upload via S3.
-    """
     db = SessionLocal()
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -78,9 +71,10 @@ async def ml_analysis_s3(file_id: str, s3_url: str, filename: str, description: 
                 ml_data = resp.json()
                 update_file_record(
                     db, file_id, 
-                    status=AnalysisStatus.COMPLETED, 
-                    score=ml_data.get("match_score", 0),
-                    details=ml_data.get("analysis_details", {})
+                        status=AnalysisStatus.COMPLETED, 
+                        score=ml_data.get("match_score", 0),
+                        details=ml_data.get("analysis_details", {}),
+                        candidate_info=ml_data.get("candidate_info", {})
                 )
             else:
                 update_file_record(db, file_id, status=AnalysisStatus.FAILED)

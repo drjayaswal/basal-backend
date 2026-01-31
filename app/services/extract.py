@@ -2,7 +2,7 @@ import io
 from PyPDF2 import PdfReader
 from docx import Document
 
-def extract_text(content: bytes, mime_type: str) -> str:
+def text(content: bytes, mime_type: str) -> str:
     text = ""
     try:
         if not content:
@@ -14,7 +14,7 @@ def extract_text(content: bytes, mime_type: str) -> str:
             reader = PdfReader(stream)
             page_texts = []
             for page in reader.pages:
-                extracted = page.extract_text()
+                extracted = page.text()
                 if extracted:
                     page_texts.append(extracted)
             text = " ".join(page_texts)

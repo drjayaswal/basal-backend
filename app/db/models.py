@@ -16,6 +16,9 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
+    linked_folder_ids = Column(JSONB, nullable=True)
+    processed_filenames = Column(JSONB, nullable=True)
+    analysis_history = Column(JSONB, nullable=True)
     analyses = relationship("ResumeAnalysis", back_populates="owner", cascade="all, delete-orphan")
 
 class ResumeAnalysis(Base):
@@ -27,6 +30,7 @@ class ResumeAnalysis(Base):
     status = Column(Enum(AnalysisStatus), default=AnalysisStatus.PENDING)
     match_score = Column(Float, default=0.0)
     details = Column(JSONB, nullable=True)
+    candidate_info = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     owner = relationship("User", back_populates="analyses")

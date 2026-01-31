@@ -4,28 +4,24 @@ import httpx
 
 from typing import List
 from pydantic import BaseModel
-
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import BackgroundTasks, UploadFile, File, Form, Depends, HTTPException
 from fastapi import Form, FastAPI, UploadFile, File, HTTPException, Depends, Security
-
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
-
+import app.services.extract as extract
 from contextlib import asynccontextmanager
-
-# Internal Imports
 from app.db.models import User
 from app.config import settings
 from app.db.models import ResumeAnalysis
-from app.db.schemas import FolderData
+from app.db.schemas import FolderData, AnalysisResponse
 from app.db.connect import init_db, get_db
-from app.services.process import ml_analysis_s3,ml_analysis_drive
-from app.services.awsClient import s3_client
+from app.services.ml_process import ml_analysis_s3,ml_analysis_drive
+from app.lib.aws_client import s3_client
 from app.db.cruds import create_initial_record
-from app.services.awsClient import upload_to_s3
-from app.services.auth import (
+from app.lib.aws_client import upload_to_s3
+from app.lib.auth_client import (
     hash_password, 
     verify_password, 
     create_access_token, 
@@ -61,13 +57,6 @@ app.add_middleware(
 class ConnectData(BaseModel):
     email: str
     password: str
-
-# class FolderData(BaseModel):
-#     folderId: str
-#     description: str
-#     userId: str
-#     googleToken: str
-#     email: Optional[str] = None
 
 # --- Auth Dependency ---
 async def get_current_user(
@@ -149,11 +138,21 @@ async def connect(data: ConnectData, db: Session = Depends(get_db)):
 
 @app.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
-    return {"email": current_user.email, "id": str(current_user.id), "authenticated": True}
+    return {
+        "email": current_user.email,
+        "id": str(current_user.id),
+        "updated_at": str(current_user.updated_at),
+        "authenticated": True
+        }
 
 
 
-
+# --- Service Routes ---
+@app.post("/get-description")
+async def get_description(file: UploadFile = File(...)):
+    content = await file.read()
+    text = extract.text(content, file.content_type)
+    return {"description": text}
 
 @app.delete("/reset-history")
 async def reset_history(
@@ -172,7 +171,7 @@ async def reset_history(
     db.commit()
     return {"status": "success"}
 
-@app.get("/history")
+@app.get("/history", response_model=List[AnalysisResponse])
 async def get_history(
     current_user: User = Depends(get_current_user), 
     db: Session = Depends(get_db)
