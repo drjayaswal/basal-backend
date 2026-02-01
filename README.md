@@ -55,9 +55,17 @@ git commit -m "describe your changes"
 
 ## Docker Deployment
 
-To build the backend Docker image:
+To build and push the Docker image providing the Google Client ID, use:
+## Platform Dependent MAC
 ```bash
 docker build -t dhruv2k3/biasbreaker-backend:latest .
+```
+## Platform Independent MAC
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t dhruv2k3/biasbreaker-backend:latest \
+  --push .
 ```
 
 To test locally:
