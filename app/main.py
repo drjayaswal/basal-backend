@@ -101,6 +101,12 @@ def save_to_history(db: Session, user: User, new_results: List[dict]):
     db.commit()
     db.refresh(user)
 
+
+@app.get("/")
+def read_root():
+    return {"status": "BiasBreaker Backend is running"}
+
+
 # --- Authentication Routes ---
 @app.post("/connect")
 async def connect(data: ConnectData, db: Session = Depends(get_db)):

@@ -1,32 +1,41 @@
 # --- Build Stage ---
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim AS builder
 
-# Alpine needs these to build psycopg2 from source
-RUN apk add --no-cache gcc musl-dev postgresql-dev
+# Install build dependencies for database drivers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
 
-# Use psycopg2-binary in requirements.txt or install it here
-RUN pip install --no-cache-dir --prefix=/install psycopg2-binary
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# Install to a local path to keep the runner stage clean
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # --- Final Stage ---
-FROM python:3.11-alpine AS runner
+FROM python:3.11-slim AS runner
+
+# Install the runtime library for Postgres
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy the libraries from the builder
-COPY --from=builder /install /usr/local
+# Copy the installed packages from the builder
+COPY --from=builder /root/.local /root/.local
+# Copy your app code
+COPY . .
 
-# Alpine needs libpq at runtime to talk to Postgres
-RUN apk add --no-cache libpq
-
-# Copy only the code folder
-COPY ./app ./app
-
+# Ensure the app can find the installed packages
+ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use Render's default port 10000
+EXPOSE 10000
+
+# Dynamic port binding for Render
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
