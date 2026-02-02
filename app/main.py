@@ -201,9 +201,7 @@ async def get_folder(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
-    is_awake = await ml_health_check()   
-    if not is_awake:
-        return
+    background_tasks.add_task(ml_health_check)
     async with httpx.AsyncClient() as client:
         drive_url = (
             f"https://www.googleapis.com/drive/v3/files?"
@@ -240,9 +238,7 @@ async def upload_files(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    is_awake = await ml_health_check()   
-    if not is_awake:
-        return
+    background_tasks.add_task(ml_health_check)
     
     for file in files:
         file_id = uuid.uuid4()
