@@ -186,15 +186,12 @@ async def reset_history(
     return {"status": "success"}
 
 @app.get("/history", response_model=List[AnalysisResponse])
-async def get_history(
-    current_user: User = Depends(get_current_user), 
-    db: Session = Depends(get_db)
-):
-    return db.query(ResumeAnalysis)\
-             .filter(ResumeAnalysis.user_id == current_user.id)\
-             .order_by(ResumeAnalysis.created_at.desc())\
-             .all()
-
+async def get_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    history = db.query(ResumeAnalysis).filter(
+        ResumeAnalysis.user_id == current_user.id
+    ).order_by(ResumeAnalysis.created_at.desc()).all()
+    
+    return history
 @app.post("/get-folder")
 async def get_folder(
     request_data: FolderData, 
@@ -243,9 +240,7 @@ async def upload_files(
     for file in files:
         file_id = uuid.uuid4()
         s3_url, s3_key = await upload_to_s3(file, file.filename)
-        
         create_initial_record(db, current_user.id, file.filename, s3_key, file_id)
-        
         background_tasks.add_task(ml_analysis_s3, str(file_id), s3_url, file.filename, description)
     
     return {"message": "Processing started"}

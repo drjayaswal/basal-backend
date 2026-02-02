@@ -18,7 +18,6 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
     linked_folder_ids = Column(JSONB, nullable=True)
     processed_filenames = Column(JSONB, nullable=True)
-    analysis_history = Column(JSONB, nullable=True)
     analyses = relationship("ResumeAnalysis", back_populates="owner", cascade="all, delete-orphan")
     credits = Column(Integer, default=1)
 
@@ -33,5 +32,5 @@ class ResumeAnalysis(Base):
     details = Column(JSONB, nullable=True)
     candidate_info = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now()) # Added server_default
     owner = relationship("User", back_populates="analyses")
