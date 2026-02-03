@@ -55,7 +55,8 @@ async def ml_analysis_drive(user_id: str, files: list, google_token: str, descri
                         "description": description
                     }
 
-                    resp = await client.post(target_url, json=payload)
+                    headers = {"X-API-Key": get_settings.ML_SERVER_API_KEY}
+                    resp = await client.post(target_url,  json=payload, headers=headers)
                     
                     if resp.status_code == 200:
                         ml_data = resp.json()
@@ -87,7 +88,7 @@ async def ml_analysis_s3(file_id: str, s3_url: str, filename: str, description: 
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             target_url = f"{get_settings.ML_SERVER_URL}/analyze-s3"
-
+            headers = {"X-API-Key": get_settings.ML_SERVER_API_KEY}
             resp = await client.post(
                 target_url, 
                 json={
@@ -95,7 +96,8 @@ async def ml_analysis_s3(file_id: str, s3_url: str, filename: str, description: 
                     "file_url": s3_url,
                     "description": description
                 },
-                timeout=120.0 
+                timeout=120.0,
+                headers=headers
             )
             
             if resp.status_code == 200:
