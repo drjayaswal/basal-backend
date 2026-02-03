@@ -9,7 +9,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 get_settings = settings()
 
-async def ml_health_check(max_retries=10, delay=10):
+async def ml_health_check(max_retries=20, delay=10):
     async with httpx.AsyncClient() as client:
         for i in range(max_retries):
             try:
