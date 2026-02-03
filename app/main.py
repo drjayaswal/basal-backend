@@ -73,10 +73,8 @@ async def get_current_user(
     return user
 
 # --- Helper Logic: Persistence ---
-def save_to_history(db: Session, user: User, new_results: List[dict]):
-    """
-    Standardized function to save results from any source into the User history.
-    """
+def save_to_history(background_tasks: BackgroundTasks,db: Session, user: User, new_results: List[dict]):
+    background_tasks.add_task(ml_health_check)
     if not new_results:
         return
     
@@ -115,7 +113,8 @@ async def health_check():
 
 # --- Authentication Routes ---
 @app.post("/connect")
-async def connect(data: ConnectData, db: Session = Depends(get_db)):
+async def connect(background_tasks: BackgroundTasks,data: ConnectData, db: Session = Depends(get_db)):
+    background_tasks.add_task(ml_health_check)
     user = db.query(User).filter(User.email == data.email).first()
 
     if user:
@@ -149,7 +148,7 @@ async def connect(data: ConnectData, db: Session = Depends(get_db)):
     }
 
 @app.get("/auth/me")
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(background_tasks: BackgroundTasks,current_user: User = Depends(get_current_user)):
     return {
         "email": current_user.email,
         "id": str(current_user.id),
