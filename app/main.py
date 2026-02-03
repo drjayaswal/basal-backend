@@ -197,6 +197,8 @@ async def get_folder(
     current_user: User = Depends(get_current_user)
 ):
     background_tasks.add_task(ml_health_check)
+    if current_user.credits == 0:
+        return {"message": "You have 0 Credits left"}
     async with httpx.AsyncClient() as client:
         drive_url = (
             f"https://www.googleapis.com/drive/v3/files?"
@@ -234,7 +236,8 @@ async def upload_files(
     current_user: User = Depends(get_current_user)
 ):
     background_tasks.add_task(ml_health_check)
-    
+    if current_user.credits == 0:
+        return {"message": "You have 0 Credits left"}
     for file in files:
         file_id = uuid.uuid4()
         s3_url, s3_key = await upload_to_s3(file, file.filename)
