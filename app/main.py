@@ -31,10 +31,8 @@ from app.lib.auth_client import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Starting backend: Creating database tables...")
     init_db()
     yield
-    print("Shutting down backend...")
 
 app = FastAPI(lifespan=lifespan)
 get_settings = settings()

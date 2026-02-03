@@ -16,7 +16,6 @@ async def ml_health_check(max_retries=10, delay=10):
                 response = await client.get(f"{get_settings.ML_SERVER_URL}/health")
                 if response.status_code == 200 and "application/json" in response.headers.get("content-type", ""):
                     return True
-                print(f"ML Server is waking up (Attempt {i+1})...")
             except Exception:
                 print(f"ML Server connection failed, retrying in {delay}s...")
             await asyncio.sleep(delay)

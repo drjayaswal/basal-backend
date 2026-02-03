@@ -30,7 +30,6 @@ def update_file_record(db: Session, file_id: str, status: AnalysisStatus, score:
         file_uuid = file_id
     db_record = db.query(ResumeAnalysis).filter(ResumeAnalysis.id == file_uuid).first()
     if not db_record:
-        print(f"CRITICAL ERROR: Record {file_id} not found in database!")
         return None
 
     db_record.status = status
@@ -41,9 +40,7 @@ def update_file_record(db: Session, file_id: str, status: AnalysisStatus, score:
         user = db.query(User).filter(User.id == db_record.user_id).first()
         if user and user.credits > 0:
             user.credits -= 1
-            print(f"Credit deducted. Remaining: {user.credits}")
 
     db.commit()
     db.refresh(db_record)
-    print(f"SUCCESS: Record {file_id} updated to {status}")
     return db_record
