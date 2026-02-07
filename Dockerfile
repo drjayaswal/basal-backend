@@ -1,41 +1,49 @@
 # --- Build Stage ---
 FROM python:3.11-slim AS builder
 
-# Install build dependencies for database drivers
+# Build tools for psycopg2, bcrypt, and other C-extensions
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     python3-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
 
-# Install to a local path to keep the runner stage clean
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Install to a prefix for easy migration to the runner stage
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
-# --- Final Stage ---
+# --- Final Runner Stage ---
 FROM python:3.11-slim AS runner
 
-# Install the runtime library for Postgres
+# libpq5 for Postgres, libgomp1 for ML models (scikit-learn/torch)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    libgomp1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Hugging Face requires a user with UID 1000
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH \
+    PYTHONUNBUFFERED=1
 
-# Copy the installed packages from the builder
-COPY --from=builder /root/.local /root/.local
-# Copy your app code
-COPY . .
+WORKDIR $HOME/app
 
-# Ensure the app can find the installed packages
-ENV PATH=/root/.local/bin:$PATH
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Copy installed libraries from builder to system path
+COPY --from=builder /install /usr/local
 
-# Use Render's default port 10000
-EXPOSE 10000
+# Copy application code and ensure the 'user' owns it
+COPY --chown=user . .
 
-# Dynamic port binding for Render
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
+# Pre-download SpaCy model (Essential for your reqs)
+RUN python -m spacy download en_core_web_md
+
+# Hugging Face strictly uses port 7860
+EXPOSE 7860
+
+# Port must be 7860 for HF Spaces
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
