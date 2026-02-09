@@ -2,24 +2,25 @@ from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, ConfigDict
+from app.db.models import Category
 
-class UserBase(BaseModel):
+class UserBaseSchema(BaseModel):
     email: EmailStr
 
-class FolderData(BaseModel):
+class FolderDataSchema(BaseModel):
     folderId: str
     googleToken: str
     description: str
 
-class UserCreate(UserBase):
+class UserCreateSchema(UserBaseSchema):
     password: str
 
-class FolderLinkRequest(BaseModel):
+class FolderLinkRequestSchema(BaseModel):
     userId: UUID
     folderId: str
     email: Optional[EmailStr] = None
 
-class AnalysisResponse(BaseModel):
+class AnalysisResponseSchema(BaseModel):
     id: UUID
     status: str
     filename: str
@@ -29,39 +30,39 @@ class AnalysisResponse(BaseModel):
     match_score: Optional[float] = None
     model_config = ConfigDict(from_attributes=True)
 
-class UserResponse(UserBase):
+class UserResponseSchema(UserBaseSchema):
     id: UUID
     updated_at: datetime
     linked_folder_ids: List[str] = []
     processed_filenames: List[str] = []
-    analyses: List[AnalysisResponse] = [] 
+    analyses: List[AnalysisResponseSchema] = [] 
     model_config = ConfigDict(from_attributes=True)
 
-class LatestFolderResponse(BaseModel):
+class LatestFolderResponseSchema(BaseModel):
     latest_folder_id: Optional[str] = None
 
-class VideoIngestRequest(BaseModel):
+class VideoIngestRequestSchema(BaseModel):
     url: str
     user_id: str
 
-class StatusUpdate(BaseModel):
+class StatusUpdateSchema(BaseModel):
     source_id: str
     status: str
 
-class ChatRequest(BaseModel):
+class ChatRequestSchema(BaseModel):
     question: str
     source_id: str
     conversation_id: Optional[str] = None
 
-class ChunkData(BaseModel):
+class ChunkDataSchema(BaseModel):
     content: str
     embedding: List[float]
 
-class SyncRequest(BaseModel):
+class SyncRequestSchema(BaseModel):
     source_id: str
-    chunks: List[ChunkData]
+    chunks: List[ChunkDataSchema]
 
-class ConnectData(BaseModel):
+class ConnectDataSchema(BaseModel):
     email: str
     password: str
 
@@ -71,3 +72,8 @@ class SourceSchema(BaseModel):
     source_type: str
     status: str
     created_at: datetime
+
+class FeedbackSchema(BaseModel):
+    email: EmailStr
+    category: Category
+    content: str

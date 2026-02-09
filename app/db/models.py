@@ -13,6 +13,13 @@ class AnalysisStatus(enum.Enum):
     COMPLETED = "completed"
     PROCESSING = "processing"
 
+class Category(enum.Enum):
+    GENERAL = "GENERAL"
+    BUG = "BUG"
+    FEATURE = "FEATURE"
+    UIUX = "UIUX"
+    OTHER = "OTHER"    
+
 class User(Base):
     __tablename__ = "users"
     credits = Column(Integer, default=1)
@@ -79,3 +86,12 @@ class ChatMessage(Base):
     conversation = relationship("Conversation", back_populates="messages")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+
+class Feedback(Base):
+    __tablename__ = "feedbacks"
+    content = Column(Text, nullable=False)
+    email = Column(String, nullable=False)
+    category = Column(Enum(Category), default=Category.GENERAL)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    

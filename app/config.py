@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     AWS_BUCKET_NAME: str
     DELETE_S3_AFTER_PROCESSING: bool = True
     ML_SERVER_API_KEY: str
+    MAIL: str
+    MAIL_PASSWORD: str
+
     model_config = SettingsConfigDict(env_file=".env")
 
 @lru_cache

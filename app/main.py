@@ -5,13 +5,12 @@ import asyncio
 import app.services.extract as extract
 
 from typing import List
-from pydantic import BaseModel
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi import BackgroundTasks, UploadFile, File, Form, Depends, HTTPException
-from fastapi import Form, FastAPI, UploadFile, File, HTTPException, Depends, Security
 from sqlalchemy.orm import Session
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm.attributes import flag_modified
+from fastapi_mail import FastMail, MessageSchema, MessageType
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Form, FastAPI, UploadFile, File, HTTPException, Depends, Security, BackgroundTasks
 
 import app.services.extract as extract
 
@@ -21,16 +20,12 @@ from app.lib.aws_client import s3_client
 from contextlib import asynccontextmanager
 from app.db.connect import init_db, get_db
 from app.lib.aws_client import upload_to_s3
+from app.lib.mail_client import conf, create_html_body
 from app.db.cruds import create_file_record, get_or_create_source
-from app.db.models import ResumeAnalysis, AnalysisStatus, SourceChunk, ChatMessage, Conversation
+from app.lib.auth_client import hash_password, verify_password, create_access_token, decode_token
+from app.db.models import ResumeAnalysis, AnalysisStatus, SourceChunk, ChatMessage, Conversation,Feedback
 from app.services.ml_process import ml_analysis_s3,ml_analysis_drive,ml_health_check,ml_analysis_video, ml_analysis_document
-from app.db.schemas import FolderData, AnalysisResponse,StatusUpdate, VideoIngestRequest, SyncRequest, ConnectData, SourceSchema, ChatRequest
-from app.lib.auth_client import (
-    hash_password, 
-    verify_password, 
-    create_access_token, 
-    decode_token
-)
+from app.db.schemas import FolderDataSchema, AnalysisResponseSchema,StatusUpdateSchema, VideoIngestRequestSchema, SyncRequestSchema, ConnectDataSchema, SourceSchema, ChatRequestSchema, FeedbackSchema
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,12 +50,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Startup Route ---
 @app.on_event("startup")
 async def startup_event():
     # Fire and forget: send a ping to ML server when Backend starts
     # This begins the ML wake-up process immediately
     asyncio.create_task(ml_health_check(max_retries=1, delay=0))
-
 
 # --- Auth Dependency ---
 async def get_current_user(
@@ -103,12 +98,10 @@ def save_to_history(background_tasks: BackgroundTasks,db: Session, user: User, n
     db.commit()
     db.refresh(user)
 
-
-
 # --- Root Routes ---
 @app.get("/")
 async def read_root():
-    return {"status": "BiasBreaker Backend is running..."}
+    return {"status": "Basal Backend is running..."}
 @app.get("/health")
 async def health_check():
     return {"service":"Backend","status": "healthy", "active":True}
@@ -119,7 +112,7 @@ async def health_check():
 
 # --- Authentication Routes ---
 @app.post("/connect")
-async def connect(background_tasks: BackgroundTasks,data: ConnectData, db: Session = Depends(get_db)):
+async def connect(background_tasks: BackgroundTasks,data: ConnectDataSchema, db: Session = Depends(get_db)):
     background_tasks.add_task(ml_health_check)
     user = db.query(User).filter(User.email == data.email).first()
 
@@ -160,12 +153,13 @@ async def get_me(background_tasks: BackgroundTasks,current_user: User = Depends(
         "id": str(current_user.id),
         "updated_at": str(current_user.updated_at),
         "authenticated": True,
-        "credits": current_user.credits
+        "credits": current_user.credits,
+        "total_conversations": len(current_user.conversations)
         }
 
 # --- Updation Routes ---
 @app.patch("/update-source-status")
-async def update_source_status(data: StatusUpdate, db: Session = Depends(get_db)):
+async def update_source_status(data: StatusUpdateSchema, db: Session = Depends(get_db)):
     src = db.query(Source).filter(Source.id == data.source_id).first()
     if src:
         src.status = AnalysisStatus(data.status)
@@ -173,7 +167,7 @@ async def update_source_status(data: StatusUpdate, db: Session = Depends(get_db)
         return {"message": "updated"}
     return {"error": "source not found"}, 404
 @app.post("/update-source-chunks")
-async def update_source_chunks(data: SyncRequest, db: Session = Depends(get_db)):
+async def update_source_chunks(data: SyncRequestSchema, db: Session = Depends(get_db)):
     try:
         source_uuid = uuid.UUID(str(data.source_id))
         
@@ -219,11 +213,10 @@ async def get_user_sources(
     except Exception as e:
         raise HTTPException(status_code=500, detail="Could not fetch sources from database")
 
-
 # --- Ingestion Routes ---
 @app.post("/ingest-video")
 async def ingest_video(
-    request: VideoIngestRequest, 
+    request: VideoIngestRequestSchema, 
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -311,7 +304,7 @@ async def reset_history(
     
     db.commit()
     return {"status": "success"}
-@app.get("/history", response_model=List[AnalysisResponse])
+@app.get("/history", response_model=List[AnalysisResponseSchema])
 async def get_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     history = db.query(ResumeAnalysis).filter(
         ResumeAnalysis.user_id == current_user.id
@@ -322,7 +315,7 @@ async def get_history(current_user: User = Depends(get_current_user), db: Sessio
 # --- Chat & Conversation Routes ---
 @app.post("/chat")
 async def chat(
-    data: ChatRequest, 
+    data: ChatRequestSchema, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -419,7 +412,7 @@ async def get_messages(conversation_id: str, db: Session = Depends(get_db)):
 # --- Service Routes ---
 @app.post("/get-folder")
 async def get_folder(
-    request_data: FolderData, 
+    request_data: FolderDataSchema, 
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
@@ -477,3 +470,37 @@ async def upload_files(
 async def get_description(file: UploadFile = File(...)):
     content = await file.read()
     return {"description": extract.text(content, file.content_type)}
+@app.post("/feedback")
+async def create_feedback(
+    data: FeedbackSchema, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    try:
+        new_feedback = Feedback(
+            email=data.email,
+            category=data.category.value,
+            content=data.content,
+        )
+        db.add(new_feedback)
+        db.commit()
+        db.refresh(new_feedback)
+
+        html_content = create_html_body(data.category.value, data.content)
+
+        message = MessageSchema(
+            subject="Feedback Received • Bridge the Gap",
+            recipients=[data.email],
+            body=html_content,
+            subtype=MessageType.html
+        )
+        fm = FastMail(conf)
+
+        background_tasks.add_task(fm.send_message, message)
+
+        return {"status": "success", "id": str(new_feedback.id)}
+        
+    except Exception as e:
+        db.rollback()
+        print(f"DEBUG: {e}")
+        raise HTTPException(status_code=400, detail="Transmission error.")

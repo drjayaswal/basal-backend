@@ -1,6 +1,6 @@
-# BiasBreaker Backend
+# Basal Backend
 
-A backend service for the BiasBreaker project that helps detect and mitigate bias in AI systems.
+A backend service for the Basal project that helps detect and mitigate bias in AI systems.
 
 ## Prerequisites
 
@@ -12,10 +12,10 @@ A backend service for the BiasBreaker project that helps detect and mitigate bia
 
 ```bash
 # Clone the repository
-git clone https://github.com/drjayaswal/biasbreaker-backend.git
+git clone https://github.com/drjayaswal/basal-backend.git
 
 # Navigate to the project directory
-cd biasbreaker-backend
+cd basal-backend
 
 # Install dependencies
 npm install
@@ -54,24 +54,24 @@ git commit -m "describe your changes"
 To build and push the Docker image providing the Google Client ID, use:
 ## Platform Dependent MAC
 ```bash
-docker build -t dhruv2k3/biasbreaker-backend:latest .
+docker build -t dhruv2k3/basal-backend:latest .
 ```
 ## Platform Independent MAC
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t dhruv2k3/biasbreaker-backend:latest \
+  -t dhruv2k3/basal-backend:latest \
   --push .
 ```
 
 To test locally:
 ```bash
-docker run -p 5000:5000 dhruv2k3/biasbreaker-backend
+docker run -p 5000:5000 dhruv2k3/basal-backend
 ```
 
 To push to Docker Hub:
 ```bash
-docker push dhruv2k3/biasbreaker-backend:latest
+docker push dhruv2k3/basal-backend:latest
 ```
 
 To run via docker-compose:

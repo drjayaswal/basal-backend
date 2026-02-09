@@ -1,13 +1,13 @@
 services:
   backend:
-    image: dhruv2k3/biasbreaker-backend:latest
+    image: dhruv2k3/basal-backend:latest
     container_name: backend
     ports:
       - "8000:8000"
     env_file:
       - .env
     networks:
-      - biasbreaker-net
+      - basal-net
 networks:
-  biasbreaker-net:
+  basal-net:
     driver: bridge
