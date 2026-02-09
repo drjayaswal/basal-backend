@@ -77,3 +77,6 @@ class FeedbackSchema(BaseModel):
     email: EmailStr
     category: Category
     content: str
+
+class FeedbackResolveSchema(BaseModel):
+    id: str

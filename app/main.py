@@ -20,12 +20,12 @@ from app.lib.aws_client import s3_client
 from contextlib import asynccontextmanager
 from app.db.connect import init_db, get_db
 from app.lib.aws_client import upload_to_s3
-from app.lib.mail_client import conf, create_html_body
+from app.lib.mail_client import conf, create_html_body, create_resolve_html_body
 from app.db.cruds import create_file_record, get_or_create_source
 from app.lib.auth_client import hash_password, verify_password, create_access_token, decode_token
 from app.db.models import ResumeAnalysis, AnalysisStatus, SourceChunk, ChatMessage, Conversation,Feedback
-from app.services.ml_process import ml_analysis_s3,ml_analysis_drive,ml_health_check,ml_analysis_video, ml_analysis_document
-from app.db.schemas import FolderDataSchema, AnalysisResponseSchema,StatusUpdateSchema, VideoIngestRequestSchema, SyncRequestSchema, ConnectDataSchema, SourceSchema, ChatRequestSchema, FeedbackSchema
+from app.services.ml_process import ml_analysis_s3, ml_analysis_drive, ml_health_check, ml_analysis_video, ml_analysis_document
+from app.db.schemas import FolderDataSchema, AnalysisResponseSchema,StatusUpdateSchema, VideoIngestRequestSchema, SyncRequestSchema, ConnectDataSchema, SourceSchema, ChatRequestSchema, FeedbackSchema, FeedbackResolveSchema
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -320,7 +320,11 @@ async def chat(
     current_user: User = Depends(get_current_user)
 ):
     settings = get_settings 
-    
+    if current_user.credits <= 0:
+        raise HTTPException(
+            status_code=402, 
+            detail="Insufficient credits. Please top up your account"
+        )
     try:
         conversation = None
         
@@ -344,7 +348,6 @@ async def chat(
 
         source_exists = db.query(SourceChunk).filter(SourceChunk.source_id == data.source_id).first()
         if not source_exists:
-            print(f"DEBUG: No chunks found for source_id: {data.source_id}")
             raise HTTPException(status_code=404, detail="Source ID not found or has no content.")
 
         async with httpx.AsyncClient() as client:
@@ -363,7 +366,6 @@ async def chat(
             ).limit(5).all()
 
             context_text = "\n\n".join([c.content for c in chunks])
-            print(f"DEBUG: Found {len(chunks)} chunks for context.")
 
             try:
                 ai_resp = await client.post(
@@ -377,11 +379,11 @@ async def chat(
                 ai_resp.raise_for_status()
                 answer_text = ai_resp.json()["answer"]
             except httpx.HTTPStatusError as e:
-                print(f"ML Generation Error: {e.response.text}")
                 raise HTTPException(status_code=502, detail="ML Model failed to generate answer")
 
         db.add(ChatMessage(conversation_id=conversation.id, role="assistant", content=answer_text))
-        
+        current_user.credits -= 1
+        db.add(current_user)        
         db.commit() 
 
         return {
@@ -398,7 +400,6 @@ async def chat(
         raise
     except Exception as e:
         db.rollback()
-        print(f"Chat Route Error: {type(e).__name__} - {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 @app.get("/conversations")
 async def get_conversations(db: Session = Depends(get_db)):
@@ -489,10 +490,16 @@ async def create_feedback(
         html_content = create_html_body(data.category.value, data.content)
 
         message = MessageSchema(
-            subject="Feedback Received • Bridge the Gap",
+            subject="Feedback Received • Basal™",
             recipients=[data.email],
             body=html_content,
-            subtype=MessageType.html
+            subtype=MessageType.html,
+            attachments=[{
+            "file": "app/static/logo.png",
+            "headers": { "Content-ID": "<logo>" },
+            "mime_type": "image",
+            "mime_subtype": "png"
+        }]
         )
         fm = FastMail(conf)
 
@@ -502,5 +509,56 @@ async def create_feedback(
         
     except Exception as e:
         db.rollback()
-        print(f"DEBUG: {e}")
         raise HTTPException(status_code=400, detail="Transmission error.")
+@app.get("/get-feedbacks")
+async def get_all_feedbacks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.email != "dhruv@gmail.com":
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied. Administrator privileges required"
+        )
+    
+    feedbacks = db.query(Feedback).order_by(Feedback.created_at.desc()).all()
+    return feedbacks
+@app.post("/resolve-feedback")
+async def resolve_feedback(
+    data: FeedbackResolveSchema, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    feedback_item = db.query(Feedback).filter(Feedback.id == data.id).first()
+    
+    if not feedback_item:
+        raise HTTPException(status_code=404, detail="Feedback record not found.")
+
+    try:
+        html_content = create_resolve_html_body(feedback_item.category, feedback_item.content)
+
+        message = MessageSchema(
+            subject="Feedback Resolved • Basal™",
+            recipients=[feedback_item.email],
+            body=html_content,
+            subtype=MessageType.html,
+            attachments=[{
+                "file": "app/static/logo.png",
+                "headers": { "Content-ID": "<logo>" },
+                "mime_type": "image",
+                "mime_subtype": "png"
+            }]
+        )
+        
+        fm = FastMail(conf)
+        background_tasks.add_task(fm.send_message, message)
+
+        db.delete(feedback_item)
+        db.commit()
+
+        return {"status": "success", "message": f"Feedback {data.id} resolved and email sent."}
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error during resolution.")
