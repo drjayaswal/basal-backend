@@ -454,7 +454,6 @@ async def chat(
         current_user.credits -= 1
         db.commit() 
         
-        # Invalidate caches
         delete(f"conversations:{current_user.id}")
         delete(f"messages:{conversation.id}")
         delete(f"user:{current_user.email}")
@@ -478,7 +477,6 @@ async def get_conversations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Cache conversations for 1 minute
     cache_key = f"conversations:{current_user.id}"
     cached = get(cache_key)
     if cached:
@@ -507,7 +505,6 @@ async def get_messages(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid conversation ID format")
     
-    # Cache messages for 30 seconds (they change frequently)
     cache_key = f"messages:{conversation_id}"
     cached = get(cache_key)
     if cached:
@@ -559,13 +556,12 @@ async def get_folder(
             raise HTTPException(status_code=400, detail="Drive access failed")
             
         files = response.json().get("files", [])
-        # Allowed MIME types: txt, docs (Google Docs), docx, doc, pdf
         allowed_mime_types = [
             'text/plain',  # txt
-            'application/vnd.google-apps.document',  # Google Docs
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # docx
-            'application/msword',  # doc
-            'application/pdf'  # pdf
+            'application/vnd.google-apps.document',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/msword',
+            'application/pdf'
         ]
         file_list = [
             f for f in files 
@@ -608,9 +604,35 @@ async def upload_files(
 
 # --- Misc Routes ---
 @app.post("/get-description")
-async def get_description(file: UploadFile = File(...)):
+async def get_description(file: UploadFile = File(...),current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
+    if current_user.credits <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits.")
     content = await file.read()
+    current_user.credits -= 1
+    db.add(current_user)
+    db.commit()
     return {"description": extract.text(content, file.content_type)}
+@app.post("/deduct-credit")
+async def deduct_credit(current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
+    if current_user.credits <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits.")
+    current_user.credits -= 1
+    db.add(current_user)
+    db.commit()
+    return {"message": "Credit deducted"}
+
+@app.post("/file-to-text")
+async def get_file_text(file: UploadFile = File(...), current_user: User = Depends(get_current_user),db: Session = Depends(get_db)):
+    if current_user.credits <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient credits.")
+    content = await file.read()
+    text = extract.text(content, file.content_type)
+    text = text.strip()
+    text = text.lower()
+    current_user.credits -= 1
+    db.add(current_user)
+    db.commit()
+    return {"text": text}
 @app.post("/feedback")
 async def create_feedback(
     data: FeedbackSchema, 
